@@ -5,15 +5,12 @@ from db import db, init_db
 app = Flask(__name__)
 app.config.from_object(Config)
 
-db.init_app(app)
-
 from models.user import User
 from models.reservation import Reservation
 from models.service import Service
 from models.review import Review
 
-with app.app_context():
-    db.create_all()
+init_db(app)
 
 @app.route('/')
 def index():
