@@ -51,3 +51,19 @@ python main.py
 ├── db.py                ← SQLAlchemy setup
 ├── main.py              ← Стартира приложението
 └── requirements.txt     ← Библиотеки
+
+
+API endpoints (всички routes)
+├── Auth endpoints (само за вход/изход)
+│   ├── POST /api/auth/register
+│   ├── POST /api/auth/login
+│   └── POST /api/auth/logout
+│
+├── Service endpoints
+│   ├── GET /api/services
+│   ├── POST /api/services
+│   └── DELETE /api/services/:id
+│
+└── Reservation endpoints
+    ├── GET /api/reservations
+    └── POST /api/reservations
