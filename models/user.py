@@ -1,15 +1,14 @@
-
 from enum import Enum
 from db import db
 
+
 class UserRole(Enum):
-    GUEST = "guest"
     USER = "user"
     PROVIDER = "provider"
     ADMIN = "admin"
 
+
 class User(db.Model):
-    """Потребител в системата с различни роли"""
     __tablename__ = 'users'
 
     id = db.Column(db.Integer, primary_key=True)

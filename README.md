@@ -19,3 +19,35 @@ pip install -r requirements.txt
 ```bash
 python main.py
 ```
+[Потребител/Postman]
+        │
+        │ HTTP заявка (POST /api/auth/register)
+        ▼
+    [main.py]  ← Flask приложение, слуша на порт 5000
+        │
+        │ Насочва към правилния Blueprint
+        ▼
+  [routes/auth.py]  ← Обработва заявката
+        │
+        │ Създава/чете User обекти
+        ▼
+  [models/user.py]  ← SQLAlchemy модел
+        │
+        │ SQL команди
+        ▼
+   [База данни]  ← SQLite файл (reservations.db)
+
+   PythonPrj/
+├── models/              ← ДАННИ (какво пазим в базата)
+│   ├── user.py          ← Потребители
+│   ├── service.py       ← Услуги
+│   ├── reservation.py   ← Резервации  
+│   └── review.py        ← Ревюта
+│
+├── routes/              ← API ENDPOINTS (как комуникираме)
+│   └── auth.py          ← Регистрация, вход, изход
+│
+├── config.py            ← Настройки (база данни, secret key)
+├── db.py                ← SQLAlchemy setup
+├── main.py              ← Стартира приложението
+└── requirements.txt     ← Библиотеки

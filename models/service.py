@@ -1,7 +1,7 @@
 from db import db
 
+
 class Service(db.Model):
-    """Услуга в сервиз"""
     __tablename__ = 'services'
 
     id = db.Column(db.Integer, primary_key=True)

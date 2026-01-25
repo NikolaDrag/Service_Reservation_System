@@ -1,7 +1,7 @@
 from db import db
 
+
 class Review(db.Model):
-    """Ревю към услуга"""
     __tablename__ = 'reviews'
 
     id = db.Column(db.Integer, primary_key=True)
