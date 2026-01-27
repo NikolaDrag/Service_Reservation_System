@@ -13,7 +13,13 @@ from models.review import Review
 init_db(app)
 
 from routes.auth import auth_bp
+from routes.services import services_bp
+from routes.reservations import reservations_bp
+from routes.reviews import reviews_bp
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
+app.register_blueprint(services_bp, url_prefix='/api/services')
+app.register_blueprint(reservations_bp, url_prefix='/api/reservations')
+app.register_blueprint(reviews_bp, url_prefix='/api/reviews')
 
 
 @app.route('/')
