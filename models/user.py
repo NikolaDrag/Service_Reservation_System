@@ -37,26 +37,34 @@ class Guest:
             Списък с речници, съдържащи данни за услугите
         """
         
-        query = Service.query # Започваме с празна заявка (SELECT * FROM services)
+        query = Service.query  # Започваме с празна заявка (SELECT * FROM services)
         
         # Добавяме филтри само ако параметърът е подаден
         if name:
-            query = query.filter(Service.name.ilike(f'%{name}%'))# ilike = case-insensitive LIKE (търси без значение от главни/малки букви)
+            # db.func.lower() = SQL функция LOWER() - прави текста малки букви
+            # LIKE с LOWER() = case-insensitive търсене (заместител на ilike)
+            search_term = f'%{name.lower()}%'
+            query = query.filter(db.func.lower(Service.name).like(search_term))
             
         if category:
-            query = query.filter(Service.category.ilike(f'%{category}%'))
+            search_term = f'%{category.lower()}%'
+            query = query.filter(db.func.lower(Service.category).like(search_term))
         
         if date_on:
+            # Вземаме резервациите за тази дата
+            # db.func.date() = SQL функция DATE() - извлича само датата от datetime поле
+            reserved_reservations = Reservation.query.filter(
+                db.func.date(Reservation.datetime) == date_on
+            ).all()
             
-            reserved_service_ids = db.session.query(Reservation.service_id).filter( # db.session.query(колона) = избираме само 1 колона, вместо целия обект
-                db.func.date(Reservation.datetime) == date_on # db.func.date() = SQL функция DATE() - извлича само датата от datetime поле
-            ).all() # Резултат: списък от tuples [(1,), (3,), (5,)]
-            
-            if reserved_service_ids:
-                reserved_ids = [r[0] for r in reserved_service_ids]
-                query = query.filter(~Service.id.in_(reserved_ids))# ~ = NOT, .in_() = IN оператор
+            # Извличаме service_id от всяка резервация
+            if reserved_reservations:
+                reserved_ids = [r.service_id for r in reserved_reservations]
+                # ~ = NOT оператор, .in_() = SQL IN оператор
+                # Филтрираме услуги, които НЕ са в списъка с резервирани
+                query = query.filter(~Service.id.in_(reserved_ids))
         
-        services = query.all() # Изпълняваме заявката и взимаме всички резултати
+        services = query.all()  # Изпълняваме заявката и взимаме всички резултати
         
         result = []
         for s in services: # Преобразуваме SQLAlchemy обектите в прости речници
@@ -162,6 +170,23 @@ class RegisteredUser(Guest, db.Model):
     # backref='customer' означава: от Reservation можеш да достъпиш reservation.customer
     reservations = db.relationship('Reservation', foreign_keys='Reservation.customer_id', backref='customer', lazy=True)
     reviews = db.relationship('Review', backref='author', lazy=True)
+
+    def __init__(self, username: str, email: str, role: UserRole = UserRole.USER):
+        """
+        Конструктор за RegisteredUser.
+        
+        Параметри:
+            username: Потребителско име
+            email: Имейл
+            role: Роля (по подразбиране USER)
+            
+        Забележка:
+            Паролата се задава отделно с set_password() за сигурност.
+        """
+        self.username = username
+        self.email = email
+        self.role = role
+        self.password_hash = ''  # Ще се зададе с set_password()
 
     # ==================== МЕТОДИ ЗА АВТЕНТИКАЦИЯ ====================
     
@@ -751,15 +776,16 @@ class Provider(RegisteredUser):
             reviews = Review.query.filter_by(service_id=service_id).all()
         else:
             # Средна оценка за ВСИЧКИ наши услуги
-            my_service_ids = db.session.query(Service.id).filter_by(
-                provider_id=self.id
-            ).all()
+            my_services = Service.query.filter_by(provider_id=self.id).all()
             
-            if not my_service_ids:
+            if not my_services:
                 return None
             
-            service_ids = [s[0] for s in my_service_ids]
-            reviews = Review.query.filter(Review.service_id.in_(service_ids)).all()
+            # Събираме ревютата за всяка наша услуга
+            reviews = []
+            for service in my_services:
+                service_reviews = Review.query.filter_by(service_id=service.id).all()
+                reviews.extend(service_reviews)  # extend = добавя елементите към списъка
         
         if not reviews:
             return None
@@ -788,6 +814,397 @@ class Provider(RegisteredUser):
             AvailabilitySlot с конкретни дни и часове.
         """
         return self.update_service(service_id, availability=availability)
+
+
+# ==================== ADMIN КЛАС ====================
+
+class Admin(Provider):
+    """
+    Администратор - наследява Provider.
+    
+    Наследяване:
+        Guest -> RegisteredUser -> Provider -> Admin
+        
+    Admin може:
+        - Всичко, което Provider може
+        - Преглед и управление на ВСИЧКИ потребители
+        - Изтриване на потребители, услуги, резервации
+        - Управление на категории
+        
+    ВАЖНО: При създаване на платформата трябва да има поне
+    един администраторски профил.
+    
+    Single Table Inheritance:
+        - Admin използва същата таблица 'users'
+        - role = UserRole.ADMIN
+    """
+    
+    __mapper_args__ = {
+        'polymorphic_identity': UserRole.ADMIN  # Когато role = ADMIN, използвай този клас
+    }
+    
+    def __init__(self, username: str, email: str, role: UserRole = UserRole.ADMIN):
+        """
+        Конструктор за Admin.
+        
+        Параметри:
+            username: Потребителско име
+            email: Имейл
+            role: Роля (по подразбиране ADMIN)
+        """
+        # Извикваме конструктора на RegisteredUser
+        super().__init__(username, email, role)
+    
+    # ==================== УПРАВЛЕНИЕ НА ПОТРЕБИТЕЛИ ====================
+    
+    def get_all_users(self, role: Optional[UserRole] = None) -> List[dict]:
+        """
+        Връща всички потребители.
+        
+        Параметри:
+            role: Филтрира по роля (незадължително)
+            
+        Връща:
+            Списък с речници с данни за потребителите
+        """
+        if role:
+            users = RegisteredUser.query.filter_by(role=role).all()
+        else:
+            users = RegisteredUser.query.all()
+        
+        result = []
+        for u in users:
+            result.append({
+                'id': u.id,
+                'username': u.username,
+                'email': u.email,
+                'role': u.role.value
+            })
+        return result
+    
+    def get_user_by_id(self, user_id: int) -> Optional[dict]:
+        """
+        Връща потребител по ID.
+        
+        Параметри:
+            user_id: ID на потребителя
+            
+        Връща:
+            Речник с данни или None ако не е намерен
+        """
+        user = RegisteredUser.query.get(user_id)
+        if not user:
+            return None
+        return user.to_dict()
+    
+    def delete_user(self, user_id: int) -> bool:
+        """
+        Изтрива потребител.
+        
+        Параметри:
+            user_id: ID на потребителя
+            
+        Връща:
+            True ако е успешно, False ако не е намерен
+            
+        Забележка:
+            Не може да изтрие себе си!
+        """
+        if user_id == self.id:
+            return False  # Не може да изтрие себе си
+        
+        user = RegisteredUser.query.get(user_id)
+        if not user:
+            return False
+        
+        db.session.delete(user)
+        db.session.commit()
+        return True
+    
+    def change_user_role(self, user_id: int, new_role: UserRole) -> bool:
+        """
+        Променя ролята на потребител.
+        
+        Параметри:
+            user_id: ID на потребителя
+            new_role: Новата роля (UserRole.USER, UserRole.PROVIDER, UserRole.ADMIN)
+            
+        Връща:
+            True ако е успешно, False ако не е намерен
+            
+        Пример:
+            admin.change_user_role(5, UserRole.PROVIDER)  # Прави потребител 5 provider
+        """
+        if user_id == self.id:
+            return False  # Не може да промени собствената си роля
+        
+        user = RegisteredUser.query.get(user_id)
+        if not user:
+            return False
+        
+        user.role = new_role
+        db.session.commit()
+        return True
+    
+    # ==================== УПРАВЛЕНИЕ НА ВСИЧКИ УСЛУГИ ====================
+    
+    def get_all_services(self, category: Optional[str] = None) -> List[dict]:
+        """
+        Връща всички услуги в системата.
+        
+        Параметри:
+            category: Филтрира по категория (незадължително)
+            
+        Връща:
+            Списък с речници с данни за услугите
+        """
+        if category:
+            services = Service.query.filter_by(category=category).all()
+        else:
+            services = Service.query.all()
+        
+        result = []
+        for s in services:
+            result.append({
+                'id': s.id,
+                'name': s.name,
+                'description': s.description,
+                'category': s.category,
+                'price': s.price,
+                'provider_id': s.provider_id
+            })
+        return result
+    
+    def delete_any_service(self, service_id: int) -> bool:
+        """
+        Изтрива услуга (независимо от собственика).
+        
+        Параметри:
+            service_id: ID на услугата
+            
+        Връща:
+            True ако е успешно, False ако не е намерена
+        """
+        service = Service.query.get(service_id)
+        if not service:
+            return False
+        
+        db.session.delete(service)
+        db.session.commit()
+        return True
+    
+    # ==================== УПРАВЛЕНИЕ НА ВСИЧКИ РЕЗЕРВАЦИИ ====================
+    
+    def get_all_reservations(self, status: Optional[ReservationStatus] = None) -> List[dict]:
+        """
+        Връща всички резервации в системата.
+        
+        Параметри:
+            status: Филтрира по статус (незадължително)
+            
+        Връща:
+            Списък с речници с данни за резервациите
+        """
+        if status:
+            reservations = Reservation.query.filter_by(status=status).all()
+        else:
+            reservations = Reservation.query.all()
+        
+        result = []
+        for r in reservations:
+            result.append({
+                'id': r.id,
+                'datetime': r.datetime.isoformat(),
+                'status': r.status.value,
+                'service_id': r.service_id,
+                'customer_id': r.customer_id,
+                'provider_id': r.provider_id,
+                'notes': r.notes
+            })
+        return result
+    
+    def delete_reservation(self, reservation_id: int) -> bool:
+        """
+        Изтрива резервация.
+        
+        Параметри:
+            reservation_id: ID на резервацията
+            
+        Връща:
+            True ако е успешно, False ако не е намерена
+        """
+        reservation = Reservation.query.get(reservation_id)
+        if not reservation:
+            return False
+        
+        db.session.delete(reservation)
+        db.session.commit()
+        return True
+    
+    # ==================== УПРАВЛЕНИЕ НА РЕВЮТА ====================
+    
+    def get_all_reviews(self) -> List[dict]:
+        """
+        Връща всички ревюта в системата.
+        
+        Връща:
+            Списък с речници с данни за ревютата
+        """
+        reviews = Review.query.all()
+        
+        result = []
+        for r in reviews:
+            result.append({
+                'id': r.id,
+                'rating': r.rating,
+                'comment': r.comment,
+                'user_id': r.user_id,
+                'service_id': r.service_id
+            })
+        return result
+    
+    def delete_review(self, review_id: int) -> bool:
+        """
+        Изтрива ревю.
+        
+        Параметри:
+            review_id: ID на ревюто
+            
+        Връща:
+            True ако е успешно, False ако не е намерено
+        """
+        review = Review.query.get(review_id)
+        if not review:
+            return False
+        
+        db.session.delete(review)
+        db.session.commit()
+        return True
+    
+    # ==================== УПРАВЛЕНИЕ НА КАТЕГОРИИ ====================
+    
+    def get_all_categories(self) -> List[str]:
+        """
+        Връща списък с всички уникални категории.
+        
+        Връща:
+            Списък със стрингове - имената на категориите
+            
+        Забележка:
+            Категориите се извличат от съществуващите услуги.
+            За по-сложна система може да се създаде отделен модел Category.
+        """
+        # Вземаме всички услуги и извличаме уникалните категории
+        services = Service.query.all()
+        categories = set()  # set = колекция без повторения
+        
+        for s in services:
+            if s.category:
+                categories.add(s.category)
+        
+        return sorted(list(categories))  # Сортираме азбучно
+    
+    def rename_category(self, old_name: str, new_name: str) -> int:
+        """
+        Преименува категория (променя във всички услуги).
+        
+        Параметри:
+            old_name: Старото име на категорията
+            new_name: Новото име
+            
+        Връща:
+            Брой променени услуги
+        """
+        services = Service.query.filter_by(category=old_name).all()
+        count = 0
+        
+        for s in services:
+            s.category = new_name
+            count += 1
+        
+        db.session.commit()
+        return count
+    
+    def delete_category(self, category_name: str) -> int:
+        """
+        Изтрива категория (изтрива ВСИЧКИ услуги в тази категория!).
+        
+        Параметри:
+            category_name: Името на категорията
+            
+        Връща:
+            Брой изтрити услуги
+            
+        ВНИМАНИЕ: Това изтрива всички услуги в категорията!
+        """
+        services = Service.query.filter_by(category=category_name).all()
+        count = len(services)
+        
+        for s in services:
+            db.session.delete(s)
+        
+        db.session.commit()
+        return count
+    
+    # ==================== СТАТИСТИКИ ====================
+    
+    def get_statistics(self) -> dict:
+        """
+        Връща статистики за системата.
+        
+        Връща:
+            Речник със статистики:
+            - total_users: Общ брой потребители
+            - total_providers: Брой доставчици
+            - total_services: Брой услуги
+            - total_reservations: Брой резервации
+            - total_reviews: Брой ревюта
+        """
+        return {
+            'total_users': RegisteredUser.query.filter_by(role=UserRole.USER).count(),
+            'total_providers': RegisteredUser.query.filter_by(role=UserRole.PROVIDER).count(),
+            'total_admins': RegisteredUser.query.filter_by(role=UserRole.ADMIN).count(),
+            'total_services': Service.query.count(),
+            'total_reservations': Reservation.query.count(),
+            'pending_reservations': Reservation.query.filter_by(status=ReservationStatus.PENDING).count(),
+            'total_reviews': Review.query.count()
+        }
+    
+    @classmethod
+    def create_initial_admin(cls, username: str, email: str, password: str) -> 'Admin':
+        """
+        Създава първоначален администратор (ако няма).
+        
+        Параметри:
+            username: Потребителско име
+            email: Имейл
+            password: Парола
+            
+        Връща:
+            Създадения Admin обект
+            
+        Изключения:
+            ValueError: Ако вече съществува администратор
+            
+        Използване:
+            При първоначална настройка на системата:
+            Admin.create_initial_admin('admin', 'admin@example.com', 'admin123')
+        """
+        # Проверяваме дали вече има админ
+        existing_admin = RegisteredUser.query.filter_by(role=UserRole.ADMIN).first()
+        if existing_admin:
+            raise ValueError("Вече съществува администратор")
+        
+        admin = Admin(
+            username=username,
+            email=email,
+            role=UserRole.ADMIN
+        )
+        admin.set_password(password)
+        
+        db.session.add(admin)
+        db.session.commit()
+        return admin
 
 
 # Alias за обратна съвместимост - старият код използва User
