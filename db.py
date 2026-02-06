@@ -49,4 +49,4 @@ def _create_initial_admin() -> None:
     
     db.session.add(admin)
     db.session.commit()
-    print("✅ Създаден първоначален администратор (admin / admin123)")
+    print("Създаден първоначален администратор (admin / admin123)")
