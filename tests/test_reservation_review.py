@@ -155,6 +155,7 @@ class TestReservation(unittest.TestCase):
         # Assert
         self.assertTrue(result)
         cancelled = db.session.get(Reservation, reservation.id)
+        assert cancelled is not None  # type guard за Pylance
         self.assertEqual(cancelled.status, ReservationStatus.CANCELED)  # CANCELED, не CANCELLED
 
 

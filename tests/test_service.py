@@ -129,6 +129,7 @@ class TestService(unittest.TestCase):
         loaded_service = db.session.get(Service, service.id)
 
         # Assert
+        assert loaded_service is not None  # type guard за Pylance
         self.assertEqual(loaded_service.provider_id, self.provider.id)
 
 

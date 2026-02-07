@@ -141,6 +141,7 @@ class TestGuest(unittest.TestCase):
 
         # Assert
         self.assertIsNotNone(result)
+        assert result is not None  # type guard за Pylance
         self.assertEqual(result['name'], 'Haircut Service')
 
     def test_view_service_not_found(self):
@@ -239,6 +240,7 @@ class TestRegisteredUser(unittest.TestCase):
 
         # Assert
         self.assertIsNotNone(result)
+        assert result is not None  # type guard за Pylance
         self.assertEqual(result.username, 'testuser')
 
     def test_login_with_username(self):
@@ -254,6 +256,7 @@ class TestRegisteredUser(unittest.TestCase):
 
         # Assert
         self.assertIsNotNone(result)
+        assert result is not None  # type guard за Pylance
         self.assertEqual(result.email, 'test@example.com')
 
     def test_login_wrong_password(self):
@@ -407,6 +410,7 @@ class TestProvider(unittest.TestCase):
         self.assertTrue(result)  # Връща bool
         # Проверяваме дали наистина е обновена
         updated = db.session.get(Service, service_id)
+        assert updated is not None  # type guard за Pylance
         self.assertEqual(updated.name, 'Нова')
         self.assertEqual(updated.price, 50.0)
 
@@ -521,6 +525,7 @@ class TestAdmin(unittest.TestCase):
         self.assertTrue(result)
         # Проверяваме дали ролята е променена
         updated_user = db.session.get(RegisteredUser, user.id)
+        assert updated_user is not None  # type guard за Pylance
         self.assertEqual(updated_user.role, UserRole.PROVIDER)
 
     def test_get_statistics(self):

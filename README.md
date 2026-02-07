@@ -5,16 +5,16 @@ REST API за резервация на часове в автосервизи (
 ## Функционалности
 
 ### За автосервизи:
-- ✅ Резервация на час за обслужване/ремонт
-- ✅ Избор на тип услуга и специалист (provider)
-- ✅ Качване на снимки/описание на проблема (`problem_image_url`)
-- ✅ Управление на график и свободни часове (`/api/reservations/available-slots`)
-- ✅ История на обслужванията (`/api/reservations/history`)
+- Резервация на час за обслужване/ремонт
+- Избор на тип услуга и специалист (provider)
+- Качване на снимки/описание на проблема (`problem_image_url`)
+- Управление на график и свободни часове
+- История на обслужванията
 
 ### Допълнителни:
-- ✅ Favorites (любими услуги)
-- ✅ Notifications (известия за резервации)
-- ✅ Reviews (ревюта)
+- Favorites (любими услуги)
+- Notifications (известия за резервации)
+- Reviews (ревюта)
 
 ## Инсталация
 
@@ -34,8 +34,9 @@ pip install -r requirements.txt
 
 ```bash
 python main.py
-# Сървър на http://127.0.0.1:5000
 ```
+
+Сървърът стартира на **http://127.0.0.1:5000** (Flask default port).
 
 ## API Endpoints
 
@@ -92,7 +93,7 @@ pylint models/ routes/
 │   ├── reservations.py # available-slots, history
 │   ├── favorites.py  # Favorites CRUD
 │   └── notifications.py # Notifications CRUD
-├── tests/            # 67 теста
+├── tests/            # 50 теста
 ├── pyproject.toml    # Конфигурация
 └── main.py           # Entry point
 ```
