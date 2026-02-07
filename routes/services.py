@@ -1,8 +1,6 @@
-from datetime import date
-from typing import Any
-
 from flask import Blueprint, request, jsonify, Response
-
+from typing import Any
+from datetime import date
 from db import db
 from models.service import Service
 from models.user import RegisteredUser, Provider, UserRole, Guest
