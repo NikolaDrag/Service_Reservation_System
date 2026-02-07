@@ -490,6 +490,17 @@ class Provider(RegisteredUser):
         'polymorphic_identity': UserRole.PROVIDER  # Когато role = PROVIDER, използвай този клас
     }
     
+    def __init__(self, username: str, email: str, role: UserRole = UserRole.PROVIDER):
+        """
+        Конструктор за Provider.
+        
+        Параметри:
+            username: Потребителско име
+            email: Имейл
+            role: Роля (по подразбиране PROVIDER)
+        """
+        super().__init__(username, email, role)
+    
     # ==================== МЕТОДИ ЗА УПРАВЛЕНИЕ НА УСЛУГИ ====================
     
     def create_service(self, name: str, description: str, category: str,
@@ -1205,8 +1216,4 @@ class Admin(Provider):
         db.session.add(admin)
         db.session.commit()
         return admin
-
-
-# Alias за обратна съвместимост - старият код използва User
-User = RegisteredUser
 

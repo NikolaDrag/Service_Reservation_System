@@ -4,15 +4,24 @@ from datetime import datetime
 from db import db
 from models.reservation import Reservation, ReservationStatus
 from models.service import Service
-from models.user import User
+from models.user import RegisteredUser, Provider, UserRole
 
 reservations_bp = Blueprint('reservations', __name__)
 
 
 @reservations_bp.route('', methods=['GET'])
 def get_reservations() -> tuple[Response, int]:
+    """
+    Връща резервации.
+    
+    Query параметри:
+        user_id: Филтрира по клиент
+        provider_id: Филтрира по доставчик
+        status: Филтрира по статус
+    """
     user_id = request.args.get('user_id', type=int)
     provider_id = request.args.get('provider_id', type=int)
+    status_str = request.args.get('status')
     
     query = Reservation.query
     
@@ -20,6 +29,12 @@ def get_reservations() -> tuple[Response, int]:
         query = query.filter_by(customer_id=user_id)
     if provider_id:
         query = query.filter_by(provider_id=provider_id)
+    if status_str:
+        try:
+            status = ReservationStatus(status_str)
+            query = query.filter_by(status=status)
+        except ValueError:
+            pass
     
     reservations = query.all()
     result = []
@@ -57,37 +72,37 @@ def get_reservation(reservation_id: int) -> tuple[Response, int]:
 
 @reservations_bp.route('', methods=['POST'])
 def create_reservation() -> tuple[Response, int]:
-    data: dict[str, Any] | None = request.get_json()
+    """
+    Създава нова резервация.
     
+    Очаква header: X-User-ID
+    Очаква JSON: datetime, service_id, notes (незадължително)
+    """
+    user_id = request.headers.get('X-User-ID')
+    if not user_id:
+        return jsonify({'error': 'Не сте влезли в системата'}), 401
+    
+    user = RegisteredUser.query.get(int(user_id))
+    if not user:
+        return jsonify({'error': 'Потребителят не съществува'}), 404
+    
+    data: dict[str, Any] | None = request.get_json()
     if not data:
         return jsonify({'error': 'Липсват данни'}), 400
     
-    required = ['datetime', 'customer_id', 'provider_id', 'service_id']
-    for field in required:
-        if field not in data:
-            return jsonify({'error': f'Липсва поле: {field}'}), 400
+    if 'datetime' not in data or 'service_id' not in data:
+        return jsonify({'error': 'Липсват задължителни полета (datetime, service_id)'}), 400
     
-    service: Service | None = Service.query.get(data['service_id'])
-    if not service:
-        return jsonify({'error': 'Услугата не съществува'}), 400
-    
-    customer: User | None = User.query.get(data['customer_id'])
-    if not customer:
-        return jsonify({'error': 'Клиентът не съществува'}), 400
-    
-    reservation = Reservation(
-        datetime=datetime.fromisoformat(data['datetime']),
-        status=ReservationStatus.PENDING,
-        customer_id=data['customer_id'],
-        provider_id=data['provider_id'],
-        service_id=data['service_id'],
-        notes=data.get('notes')
-    )
-    
-    db.session.add(reservation)
-    db.session.commit()
-    
-    return jsonify({'message': 'Резервацията е създадена', 'reservation_id': reservation.id}), 201
+    try:
+        # Използваме метода create_reservation от RegisteredUser
+        reservation = user.create_reservation(
+            service_id=data['service_id'],
+            reservation_date=datetime.fromisoformat(data['datetime']),
+            notes=data.get('notes')
+        )
+        return jsonify({'message': 'Резервацията е създадена', 'reservation_id': reservation.id}), 201
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
 
 
 @reservations_bp.route('/<int:reservation_id>', methods=['PUT'])

@@ -5,7 +5,8 @@ from db import init_db
 app: Flask = Flask(__name__)
 app.config.from_object(Config)
 
-from models.user import User
+# Импортираме моделите с новите класове
+from models.user import RegisteredUser, Provider, Admin
 from models.reservation import Reservation
 from models.service import Service
 from models.review import Review

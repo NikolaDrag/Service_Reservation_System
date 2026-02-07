@@ -1,82 +1,104 @@
 from flask import Blueprint, request, jsonify, Response
 from typing import Any
+from datetime import date
 from db import db
 from models.service import Service
-from models.user import User, UserRole
+from models.user import RegisteredUser, Provider, Admin, UserRole, Guest
 
 services_bp = Blueprint('services', __name__)
 
 
 @services_bp.route('', methods=['GET'])
 def get_all_services() -> tuple[Response, int]:
+    """Връща всички услуги."""
     services = Service.query.all()
-    result = []
-    for s in services:
-        result.append({
-            'id': s.id,
-            'name': s.name,
-            'description': s.description,
-            'category': s.category,
-            'provider_id': s.provider_id,
-            'image_url': s.image_url
-        })
+    result = [s.to_dict() for s in services]
     return jsonify(result), 200
 
 
 @services_bp.route('/<int:service_id>', methods=['GET'])
 def get_service(service_id: int) -> tuple[Response, int]:
-    service: Service | None = Service.query.get(service_id)
+    """Връща услуга по ID."""
+    # Използваме Guest.view_service()
+    guest = Guest()
+    service = guest.view_service(service_id)
     
     if not service:
         return jsonify({'error': 'Услугата не е намерена'}), 404
     
-    return jsonify({
-        'id': service.id,
-        'name': service.name,
-        'description': service.description,
-        'category': service.category,
-        'provider_id': service.provider_id,
-        'working_hours_start': str(service.working_hours_start) if service.working_hours_start else None,
-        'working_hours_end': str(service.working_hours_end) if service.working_hours_end else None,
-        'image_url': service.image_url
-    }), 200
+    return jsonify(service), 200
 
 
 @services_bp.route('', methods=['POST'])
 def create_service() -> tuple[Response, int]:
+    """
+    Създава нова услуга.
+    
+    Очаква header: X-User-ID (трябва да е Provider или Admin)
+    """
+    user_id = request.headers.get('X-User-ID')
+    if not user_id:
+        return jsonify({'error': 'Не сте влезли в системата'}), 401
+    
+    user = RegisteredUser.query.get(int(user_id))
+    if not user or user.role not in [UserRole.PROVIDER, UserRole.ADMIN]:
+        return jsonify({'error': 'Нямате права да създавате услуги'}), 403
+    
     data: dict[str, Any] | None = request.get_json()
+    if not data or not data.get('name') or not data.get('category'):
+        return jsonify({'error': 'Липсват задължителни полета (name, category)'}), 400
     
-    if not data or not data.get('name') or not data.get('category') or not data.get('provider_id'):
-        return jsonify({'error': 'Липсват задължителни полета'}), 400
-    
-    provider: User | None = User.query.get(data['provider_id'])
-    if not provider or provider.role not in [UserRole.PROVIDER, UserRole.ADMIN]:
-        return jsonify({'error': 'Невалиден доставчик'}), 400
-    
-    service = Service(
-        name=data['name'],
-        description=data.get('description'),
-        category=data['category'],
-        provider_id=data['provider_id'],
-        image_url=data.get('image_url')
-    )
-    
-    db.session.add(service)
-    db.session.commit()
+    # Създаваме Provider обект за да използваме методите му
+    provider = Provider.query.get(int(user_id))
+    if not provider:
+        # Ако не е Provider обект, използваме директно Service
+        service = Service(
+            name=data['name'],
+            category=data['category'],
+            provider_id=int(user_id),
+            description=data.get('description'),
+            price=data.get('price', 0.0),
+            duration=data.get('duration', 60),
+            availability=data.get('availability'),
+            image_url=data.get('image_url')
+        )
+        db.session.add(service)
+        db.session.commit()
+    else:
+        service = provider.create_service(
+            name=data['name'],
+            description=data.get('description', ''),
+            category=data['category'],
+            price=data.get('price', 0.0),
+            duration=data.get('duration', 60),
+            availability=data.get('availability')
+        )
     
     return jsonify({'message': 'Услугата е създадена', 'service_id': service.id}), 201
 
 
 @services_bp.route('/<int:service_id>', methods=['PUT'])
 def update_service(service_id: int) -> tuple[Response, int]:
-    service: Service | None = Service.query.get(service_id)
+    """Обновява услуга."""
+    user_id = request.headers.get('X-User-ID')
+    if not user_id:
+        return jsonify({'error': 'Не сте влезли в системата'}), 401
     
-    if not service:
-        return jsonify({'error': 'Услугата не е намерена'}), 404
+    user = RegisteredUser.query.get(int(user_id))
+    if not user:
+        return jsonify({'error': 'Потребителят не е намерен'}), 404
     
     data: dict[str, Any] | None = request.get_json()
     if not data:
         return jsonify({'error': 'Няма данни за обновяване'}), 400
+    
+    service = Service.query.get(service_id)
+    if not service:
+        return jsonify({'error': 'Услугата не е намерена'}), 404
+    
+    # Проверяваме дали е собственик или админ
+    if service.provider_id != int(user_id) and user.role != UserRole.ADMIN:
+        return jsonify({'error': 'Нямате права да редактирате тази услуга'}), 403
     
     if 'name' in data:
         service.name = data['name']
@@ -84,48 +106,74 @@ def update_service(service_id: int) -> tuple[Response, int]:
         service.description = data['description']
     if 'category' in data:
         service.category = data['category']
+    if 'price' in data:
+        service.price = data['price']
+    if 'duration' in data:
+        service.duration = data['duration']
+    if 'availability' in data:
+        service.availability = data['availability']
     if 'image_url' in data:
         service.image_url = data['image_url']
     
     db.session.commit()
-    
     return jsonify({'message': 'Услугата е обновена'}), 200
 
 
 @services_bp.route('/<int:service_id>', methods=['DELETE'])
 def delete_service(service_id: int) -> tuple[Response, int]:
-    service: Service | None = Service.query.get(service_id)
+    """Изтрива услуга."""
+    user_id = request.headers.get('X-User-ID')
+    if not user_id:
+        return jsonify({'error': 'Не сте влезли в системата'}), 401
     
+    user = RegisteredUser.query.get(int(user_id))
+    if not user:
+        return jsonify({'error': 'Потребителят не е намерен'}), 404
+    
+    service = Service.query.get(service_id)
     if not service:
         return jsonify({'error': 'Услугата не е намерена'}), 404
     
+    # Проверяваме права
+    if service.provider_id != int(user_id) and user.role != UserRole.ADMIN:
+        return jsonify({'error': 'Нямате права да изтриете тази услуга'}), 403
+    
     db.session.delete(service)
     db.session.commit()
-    
     return jsonify({'message': 'Услугата е изтрита'}), 200
 
 
 @services_bp.route('/search', methods=['GET'])
 def search_services() -> tuple[Response, int]:
-    name = request.args.get('name', '')
-    category = request.args.get('category', '')
+    """
+    Търси услуги.
     
-    query = Service.query
+    Query параметри:
+        name: Част от името
+        category: Категория
+        date: Дата (YYYY-MM-DD)
+    """
+    name = request.args.get('name')
+    category = request.args.get('category')
+    date_str = request.args.get('date')
     
-    if name:
-        query = query.filter(Service.name.ilike(f'%{name}%'))
-    if category:
-        query = query.filter(Service.category.ilike(f'%{category}%'))
+    date_on = None
+    if date_str:
+        try:
+            date_on = date.fromisoformat(date_str)
+        except ValueError:
+            return jsonify({'error': 'Невалиден формат на дата. Използвайте YYYY-MM-DD'}), 400
     
-    services = query.all()
-    result = []
-    for s in services:
-        result.append({
-            'id': s.id,
-            'name': s.name,
-            'description': s.description,
-            'category': s.category,
-            'provider_id': s.provider_id
-        })
+    # Използваме Guest.search_services()
+    guest = Guest()
+    result = guest.search_services(name=name, category=category, date_on=date_on)
     
     return jsonify(result), 200
+
+
+@services_bp.route('/<int:service_id>/reviews', methods=['GET'])
+def get_service_reviews(service_id: int) -> tuple[Response, int]:
+    """Връща ревютата за услуга."""
+    guest = Guest()
+    reviews = guest.view_reviews(service_id)
+    return jsonify(reviews), 200

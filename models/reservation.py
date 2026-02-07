@@ -24,7 +24,7 @@ class Reservation(db.Model):
     service_id = db.Column(db.Integer, db.ForeignKey('services.id'), nullable=False)
 
     service = db.relationship('Service', backref='reservations')
-    provider = db.relationship('User', foreign_keys=[provider_id], backref='provided_reservations')
+    provider = db.relationship('RegisteredUser', foreign_keys=[provider_id], backref='provided_reservations')
 
     def __init__(self, datetime, customer_id: int, provider_id: int, service_id: int,
                  status: ReservationStatus = ReservationStatus.PENDING, notes: Optional[str] = None):
