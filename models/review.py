@@ -15,7 +15,7 @@ class Review(db.Model):
     def __init__(self, rating: int, user_id: int, service_id: int, comment: Optional[str] = None):
         """
         Конструктор за Review.
-        
+
         Параметри:
             rating: Оценка (1-5)
             user_id: ID на потребителя, който оставя ревюто

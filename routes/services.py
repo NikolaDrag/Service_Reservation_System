@@ -1,9 +1,11 @@
-from flask import Blueprint, request, jsonify, Response
-from typing import Any
 from datetime import date
+from typing import Any
+
+from flask import Blueprint, request, jsonify, Response
+
 from db import db
 from models.service import Service
-from models.user import RegisteredUser, Provider, Admin, UserRole, Guest
+from models.user import RegisteredUser, Provider, UserRole, Guest
 
 services_bp = Blueprint('services', __name__)
 
@@ -19,13 +21,12 @@ def get_all_services() -> tuple[Response, int]:
 @services_bp.route('/<int:service_id>', methods=['GET'])
 def get_service(service_id: int) -> tuple[Response, int]:
     """Връща услуга по ID."""
-    # Използваме Guest.view_service()
     guest = Guest()
     service = guest.view_service(service_id)
-    
+
     if not service:
         return jsonify({'error': 'Услугата не е намерена'}), 404
-    
+
     return jsonify(service), 200
 
 
@@ -33,25 +34,23 @@ def get_service(service_id: int) -> tuple[Response, int]:
 def create_service() -> tuple[Response, int]:
     """
     Създава нова услуга.
-    
+
     Очаква header: X-User-ID (трябва да е Provider или Admin)
     """
     user_id = request.headers.get('X-User-ID')
     if not user_id:
         return jsonify({'error': 'Не сте влезли в системата'}), 401
-    
-    user = RegisteredUser.query.get(int(user_id))
+
+    user = db.session.get(RegisteredUser, int(user_id))
     if not user or user.role not in [UserRole.PROVIDER, UserRole.ADMIN]:
         return jsonify({'error': 'Нямате права да създавате услуги'}), 403
-    
+
     data: dict[str, Any] | None = request.get_json()
     if not data or not data.get('name') or not data.get('category'):
         return jsonify({'error': 'Липсват задължителни полета (name, category)'}), 400
-    
-    # Създаваме Provider обект за да използваме методите му
-    provider = Provider.query.get(int(user_id))
+
+    provider = db.session.get(Provider, int(user_id))
     if not provider:
-        # Ако не е Provider обект, използваме директно Service
         service = Service(
             name=data['name'],
             category=data['category'],
@@ -73,7 +72,7 @@ def create_service() -> tuple[Response, int]:
             duration=data.get('duration', 60),
             availability=data.get('availability')
         )
-    
+
     return jsonify({'message': 'Услугата е създадена', 'service_id': service.id}), 201
 
 
@@ -83,23 +82,22 @@ def update_service(service_id: int) -> tuple[Response, int]:
     user_id = request.headers.get('X-User-ID')
     if not user_id:
         return jsonify({'error': 'Не сте влезли в системата'}), 401
-    
-    user = RegisteredUser.query.get(int(user_id))
+
+    user = db.session.get(RegisteredUser, int(user_id))
     if not user:
         return jsonify({'error': 'Потребителят не е намерен'}), 404
-    
+
     data: dict[str, Any] | None = request.get_json()
     if not data:
         return jsonify({'error': 'Няма данни за обновяване'}), 400
-    
-    service = Service.query.get(service_id)
+
+    service = db.session.get(Service, service_id)
     if not service:
         return jsonify({'error': 'Услугата не е намерена'}), 404
-    
-    # Проверяваме дали е собственик или админ
+
     if service.provider_id != int(user_id) and user.role != UserRole.ADMIN:
         return jsonify({'error': 'Нямате права да редактирате тази услуга'}), 403
-    
+
     if 'name' in data:
         service.name = data['name']
     if 'description' in data:
@@ -114,7 +112,7 @@ def update_service(service_id: int) -> tuple[Response, int]:
         service.availability = data['availability']
     if 'image_url' in data:
         service.image_url = data['image_url']
-    
+
     db.session.commit()
     return jsonify({'message': 'Услугата е обновена'}), 200
 
@@ -125,19 +123,19 @@ def delete_service(service_id: int) -> tuple[Response, int]:
     user_id = request.headers.get('X-User-ID')
     if not user_id:
         return jsonify({'error': 'Не сте влезли в системата'}), 401
-    
-    user = RegisteredUser.query.get(int(user_id))
+
+    user = db.session.get(RegisteredUser, int(user_id))
     if not user:
         return jsonify({'error': 'Потребителят не е намерен'}), 404
-    
-    service = Service.query.get(service_id)
+
+    service = db.session.get(Service, service_id)
     if not service:
         return jsonify({'error': 'Услугата не е намерена'}), 404
-    
+
     # Проверяваме права
     if service.provider_id != int(user_id) and user.role != UserRole.ADMIN:
         return jsonify({'error': 'Нямате права да изтриете тази услуга'}), 403
-    
+
     db.session.delete(service)
     db.session.commit()
     return jsonify({'message': 'Услугата е изтрита'}), 200
@@ -147,7 +145,7 @@ def delete_service(service_id: int) -> tuple[Response, int]:
 def search_services() -> tuple[Response, int]:
     """
     Търси услуги.
-    
+
     Query параметри:
         name: Част от името
         category: Категория
@@ -156,18 +154,17 @@ def search_services() -> tuple[Response, int]:
     name = request.args.get('name')
     category = request.args.get('category')
     date_str = request.args.get('date')
-    
+
     date_on = None
     if date_str:
         try:
             date_on = date.fromisoformat(date_str)
         except ValueError:
             return jsonify({'error': 'Невалиден формат на дата. Използвайте YYYY-MM-DD'}), 400
-    
-    # Използваме Guest.search_services()
+
     guest = Guest()
     result = guest.search_services(name=name, category=category, date_on=date_on)
-    
+
     return jsonify(result), 200
 
 

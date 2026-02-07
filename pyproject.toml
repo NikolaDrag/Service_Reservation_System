@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "service-reservation-system"
+version = "1.0.0"
+description = "REST API за резервация на часове в автосервизи"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    {name = "Nikola Dragnev, 1MI0800237"}
+]
+
+dependencies = [
+    "Flask>=3.0.0",
+    "Flask-SQLAlchemy>=3.1.1",
+    "SQLAlchemy>=2.0.36",
+    "Werkzeug>=3.0.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["models*", "routes*"]
+exclude = ["tests*", "instance*"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "coverage>=7.0.0",
+    "pylint>=3.0.0",
+    "mypy>=1.0.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.pylint.main]
+max-line-length = 120
+disable = [
+    "C0114",  # missing-module-docstring
+    "C0115",  # missing-class-docstring
+    "C0116",  # missing-function-docstring
+    "R0903",  # too-few-public-methods
+    "R0913",  # too-many-arguments
+    "R0917",  # too-many-positional-arguments
+    "C0302",  # too-many-lines
+    "R0902",  # too-many-instance-attributes
+]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_ignores = true
+ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["models", "routes"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+]
