@@ -61,8 +61,12 @@ curl.exe http://localhost:5000/api/auth/profile -H "X-User-Id: 3"
 # СЦЕНАРИЙ D: РЕЗЕРВАЦИЯ СЪС СНИМКА НА ПРОБЛЕМ
 # ============================================================
 
-# Клиентът изпраща URL към снимка при създаване на резервация
-curl.exe -X POST http://localhost:5000/api/reservations -H "Content-Type: application/json" -H "X-User-Id: 3" -d '{\"service_id\":1,\"datetime\":\"2026-02-10T14:00:00\",\"notes\":\"Engine noise\",\"problem_image_url\":\"https://cdn.pixabay.com/photo/2017/05/06/16/01/oil-2290305_640.jpg\"}'
+# Клиентът изпраща URL към снимка при създаване на резервация (Случай: Смяна на масло)
+# Използваме User-Id: 1 (Admin/Provider), който винаги съществува
+curl.exe -X POST http://localhost:5000/api/reservations -H "Content-Type: application/json" -H "X-User-Id: 1" -d '{\"service_id\":1,\"datetime\":\"2026-02-10T14:00:00\",\"notes\":\"Need oil change\",\"problem_image_url\":\"https://upload.wikimedia.org/wikipedia/commons/6/68/SIGAUS_aceite.jpg\"}'
+
+# Проверка: Виждаме, че URL-ът на снимката е запазен
+curl.exe "http://localhost:5000/api/reservations?user_id=1"
 
 # ============================================================
 # СЦЕНАРИЙ E: ЛЮБИМИ УСЛУГИ (с admin акаунт)
@@ -97,8 +101,8 @@ curl.exe -X PUT http://localhost:5000/api/notifications/read-all -H "X-User-Id: 
 # СЦЕНАРИЙ G: РЕВЮТА (Reviews)
 # ============================================================
 
-# G1. Създаване на ревю (от ivan, ID=3)
-curl.exe -X POST http://localhost:5000/api/reviews -H "Content-Type: application/json" -H "X-User-Id: 3" -d '{\"service_id\":1,\"rating\":5,\"comment\":\"Excellent service!\"}'
+# G1. Създаване на ревю (от admin, ID=1)
+curl.exe -X POST http://localhost:5000/api/reviews -H "Content-Type: application/json" -H "X-User-Id: 1" -d '{\"service_id\":1,\"rating\":5,\"comment\":\"Excellent service!\"}'
 
 # G2. Преглед на ревюта за услуга
 curl.exe http://localhost:5000/api/services/1/reviews
