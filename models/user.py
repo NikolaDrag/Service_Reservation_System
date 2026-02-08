@@ -445,6 +445,136 @@ class RegisteredUser(Guest, db.Model):
         db.session.commit()
         return True
 
+    # ==================== МЕТОДИ ЗА ЛЮБИМИ ====================
+
+    def add_favorite(self, service_id: int) -> bool:
+        """
+        Добавя услуга към любими.
+
+        Параметри:
+            service_id: ID на услугата
+
+        Връща:
+            True ако е добавено успешно, False ако вече е в любими
+
+        Изключения:
+            ValueError: Ако услугата не съществува
+        """
+        from models.favorite import Favorite
+
+        service = db.session.get(Service, service_id)
+        if not service:
+            raise ValueError("Услугата не съществува")
+
+        # Проверяваме дали вече е в любими
+        existing = Favorite.query.filter_by(
+            user_id=self.id, service_id=service_id
+        ).first()
+        if existing:
+            return False
+
+        favorite = Favorite(user_id=self.id, service_id=service_id)
+        db.session.add(favorite)
+        db.session.commit()
+        return True
+
+    def remove_favorite(self, service_id: int) -> bool:
+        """
+        Премахва услуга от любими.
+
+        Параметри:
+            service_id: ID на услугата
+
+        Връща:
+            True ако е премахнато, False ако не е било в любими
+        """
+        from models.favorite import Favorite
+
+        favorite = Favorite.query.filter_by(
+            user_id=self.id, service_id=service_id
+        ).first()
+        if not favorite:
+            return False
+
+        db.session.delete(favorite)
+        db.session.commit()
+        return True
+
+    def get_favorites(self) -> List[dict]:
+        """
+        Връща списък с любими услуги.
+
+        Връща:
+            Списък с речници, съдържащи данни за любимите услуги
+        """
+        from models.favorite import Favorite
+        favorites = Favorite.query.filter_by(user_id=self.id).all()
+        return [f.to_dict() for f in favorites]
+
+    # ==================== МЕТОДИ ЗА ИЗВЕСТИЯ ====================
+
+    def get_notifications(self, unread_only: bool = False) -> dict:
+        """
+        Връща известията на потребителя.
+
+        Параметри:
+            unread_only: Ако е True, връща само непрочетените
+
+        Връща:
+            Речник с 'notifications' списък и 'unread_count'
+        """
+        from models.notification import Notification
+
+        query = Notification.query.filter_by(user_id=self.id)
+        if unread_only:
+            query = query.filter_by(is_read=False)
+
+        notifications = query.order_by(Notification.created_at.desc()).all()
+        unread_count = Notification.query.filter_by(
+            user_id=self.id, is_read=False
+        ).count()
+
+        return {
+            'notifications': [n.to_dict() for n in notifications],
+            'unread_count': unread_count
+        }
+
+    def mark_notification_read(self, notification_id: int) -> bool:
+        """
+        Маркира известие като прочетено.
+
+        Параметри:
+            notification_id: ID на известието
+
+        Връща:
+            True ако е успешно, False ако известието не е намерено
+            или не принадлежи на този потребител
+        """
+        from models.notification import Notification
+
+        notification = db.session.get(Notification, notification_id)
+        if not notification or notification.user_id != self.id:
+            return False
+
+        notification.mark_as_read()
+        db.session.commit()
+        return True
+
+    def mark_all_notifications_read(self) -> int:
+        """
+        Маркира всички известия като прочетени.
+
+        Връща:
+            Брой маркирани известия
+        """
+        from models.notification import Notification
+
+        count = Notification.query.filter_by(
+            user_id=self.id, is_read=False
+        ).update({'is_read': True})
+        db.session.commit()
+        return count
+
     def to_dict(self) -> dict:
         """
         Преобразува потребителя в речник.
