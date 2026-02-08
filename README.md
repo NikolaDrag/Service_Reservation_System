@@ -56,7 +56,8 @@ GitHub линк към проекта: https://github.com/NikolaDrag/Service_Res
 |------|-------|--------|
 | Admin | admin@reservations.com | admin123 |
 | Provider | service@autoservice.bg | provider123 |
-(id-та 1 и 2)
+
+**Забележка:** При автоматичното създаване на базата, Admin получава `ID=1`, а Provider получава `ID=2`. Използвайте тези ID-та за хедъра `X-User-Id` в демонстрационните команди.
 
 ## Начални услуги
 
