@@ -5,8 +5,8 @@
 # ============================================================
 #
 #  ВАЖНО: Командите са оптимизирани за Windows PowerShell и curl.exe.
-#  JSON форматът използва синтаксис: -d '{\"key\":\"value\"}'
-#  За Mac/Linux: използвайте стандартния синтаксис: -d '{"key":"value"}'
+#  JSON форматът използва синтаксис: -d "{\"key\":\"value\"}"
+#  (двойни кавички отвън, ескейпнати двойни вътре)
 #
 # ============================================================
 
@@ -36,13 +36,13 @@ curl.exe "http://localhost:5000/api/services?category=Поддръжка"
 curl.exe "http://localhost:5000/api/reservations/available-slots?service_id=1&date=2026-02-10"
 
 # B2. Създаване на резервация (от admin, ID=1)
-curl.exe -X POST http://localhost:5000/api/reservations -H "Content-Type: application/json" -H "X-User-Id: 1" -d '{\"service_id\":1,\"datetime\":\"2026-02-10T10:00:00\",\"notes\":\"Oil change\"}'
+curl.exe -X POST http://localhost:5000/api/reservations -H "Content-Type: application/json" -H "X-User-Id: 1" -d "{\`"service_id\`":1,\`"datetime\`":\`"2026-02-10T10:00:00\`",\`"notes\`":\`"OilChange\`"}"
 
 # B3. Проверка че часът вече е зает (10:00 НЕ трябва да е в списъка)
 curl.exe "http://localhost:5000/api/reservations/available-slots?service_id=1&date=2026-02-10"
 
 # B4. Повторен опит за същия час
-curl.exe -X POST http://localhost:5000/api/reservations -H "Content-Type: application/json" -H "X-User-Id: 1" -d '{\"service_id\":1,\"datetime\":\"2026-02-10T10:00:00\"}'
+curl.exe -X POST http://localhost:5000/api/reservations -H "Content-Type: application/json" -H "X-User-Id: 1" -d "{\`"service_id\`":1,\`"datetime\`":\`"2026-02-10T10:00:00\`"}"
 
 # ============================================================
 # СЦЕНАРИЙ C: РЕГИСТРАЦИЯ И ПРОФИЛ
@@ -52,7 +52,7 @@ curl.exe -X POST http://localhost:5000/api/reservations -H "Content-Type: applic
 curl.exe http://localhost:5000/api/auth/profile -H "X-User-Id: 1"
 
 # C2. Регистрация на нов потребител
-curl.exe -X POST http://localhost:5000/api/auth/register -H "Content-Type: application/json" -d '{\"username\":\"ivan\",\"email\":\"ivan@mail.bg\",\"password\":\"ivan123\"}'
+curl.exe -X POST http://localhost:5000/api/auth/register -H "Content-Type: application/json" -d "{\`"username\`":\`"ivan\`",\`"email\`":\`"ivan@mail.bg\`",\`"password\`":\`"ivan123\`"}"
 
 # C3. Преглед на профил на новия потребител (ID=3)
 curl.exe http://localhost:5000/api/auth/profile -H "X-User-Id: 3"
@@ -63,7 +63,7 @@ curl.exe http://localhost:5000/api/auth/profile -H "X-User-Id: 3"
 
 # Клиентът изпраща URL към снимка при създаване на резервация (Случай: Смяна на масло)
 # Използваме User-Id: 1 (Admin/Provider), който винаги съществува
-curl.exe -X POST http://localhost:5000/api/reservations -H "Content-Type: application/json" -H "X-User-Id: 1" -d '{\"service_id\":1,\"datetime\":\"2026-02-10T14:00:00\",\"notes\":\"Need oil change\",\"problem_image_url\":\"https://upload.wikimedia.org/wikipedia/commons/6/68/SIGAUS_aceite.jpg\"}'
+curl.exe -X POST http://localhost:5000/api/reservations -H "Content-Type: application/json" -H "X-User-Id: 1" -d "{\`"service_id\`":1,\`"datetime\`":\`"2026-02-10T14:00:00\`",\`"notes\`":\`"NeedOilChange\`",\`"problem_image_url\`":\`"https://upload.wikimedia.org/wikipedia/commons/6/68/SIGAUS_aceite.jpg\`"}"
 
 # Проверка: Виждаме, че URL-ът на снимката е запазен
 curl.exe "http://localhost:5000/api/reservations?user_id=1"
@@ -73,7 +73,7 @@ curl.exe "http://localhost:5000/api/reservations?user_id=1"
 # ============================================================
 
 # E1. Добавяне на услуга към любими
-curl.exe -X POST http://localhost:5000/api/favorites -H "Content-Type: application/json" -H "X-User-Id: 1" -d '{\"service_id\":1}'
+curl.exe -X POST http://localhost:5000/api/favorites -H "Content-Type: application/json" -H "X-User-Id: 1" -d "{\`"service_id\`":1}"
 
 # E2. Преглед на любими
 curl.exe http://localhost:5000/api/favorites -H "X-User-Id: 1"
@@ -102,7 +102,7 @@ curl.exe -X PUT http://localhost:5000/api/notifications/read-all -H "X-User-Id: 
 # ============================================================
 
 # G1. Създаване на ревю (от admin, ID=1)
-curl.exe -X POST http://localhost:5000/api/reviews -H "Content-Type: application/json" -H "X-User-Id: 1" -d '{\"service_id\":1,\"rating\":5,\"comment\":\"Excellent service!\"}'
+curl.exe -X POST http://localhost:5000/api/reviews -H "Content-Type: application/json" -H "X-User-Id: 1" -d "{\`"service_id\`":1,\`"rating\`":5,\`"comment\`":\`"ExcellentService\`"}"
 
 # G2. Преглед на ревюта за услуга
 curl.exe http://localhost:5000/api/services/1/reviews
