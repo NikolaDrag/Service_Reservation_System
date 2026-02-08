@@ -61,11 +61,21 @@ python main.py
 | PUT | /api/notifications/:id/read | Маркирай прочетено |
 | PUT | /api/notifications/read-all | Маркирай всички прочетени |
 
-## Примерен профил
+## Примерни акаунти
 
 | Роля | Email | Парола |
 |------|-------|--------|
 | Admin | admin@reservations.com | admin123 |
+| Provider | service@autoservice.bg | provider123 |
+
+## Начални услуги
+
+При стартиране автоматично се създават 5 демо услуги:
+- Смяна на масло (89.99 лв, 30 мин)
+- Смяна на накладки (120 лв, 60 мин)
+- Компютърна диагностика (45 лв, 30 мин)
+- Смяна на гуми (40 лв, 45 мин)
+- Годишен технически преглед (70 лв, 90 мин)
 
 ## Тестове
 
@@ -93,7 +103,7 @@ pylint models/ routes/
 │   ├── reservations.py # available-slots, history
 │   ├── favorites.py  # Favorites CRUD
 │   └── notifications.py # Notifications CRUD
-├── tests/            # 50 теста
+├── tests/            # 219 теста, 92% coverage
 ├── pyproject.toml    # Конфигурация
 └── main.py           # Entry point
 ```

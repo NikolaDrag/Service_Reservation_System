@@ -159,14 +159,12 @@ class RegisteredUser(Guest, db.Model):
     """
     __tablename__ = 'users'
 
-    # Колони в базата данни
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.Enum(UserRole), nullable=False, default=UserRole.USER)
 
-    # Релации с други таблици
     # backref='customer' означава: от Reservation можеш да достъпиш reservation.customer
     reservations = db.relationship('Reservation', foreign_keys='Reservation.customer_id', backref='customer', lazy=True)
     reviews = db.relationship('Review', backref='author', lazy=True)
@@ -286,10 +284,8 @@ class RegisteredUser(Guest, db.Model):
             problem_image_url=problem_image_url     # снимка на проблема
         )
 
-        # db.session.add() - подготвя обекта за запис (още не е в базата!)
         db.session.add(reservation)
 
-        # db.session.commit() - ЗАПИСВА в базата данни (като "Save" бутон)
         db.session.commit()
 
         return reservation

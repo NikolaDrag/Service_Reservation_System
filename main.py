@@ -4,6 +4,7 @@ from db import init_db
 
 app: Flask = Flask(__name__)
 app.config.from_object(Config)
+app.json.ensure_ascii = False  # type: ignore  # Показва кирилица (Flask 3.0+)
 
 from models.user import RegisteredUser, Provider, Admin
 from models.reservation import Reservation

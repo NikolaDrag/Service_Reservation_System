@@ -1,0 +1,127 @@
+# ============================================================
+#  ДЕМОНСТРАЦИЯ НА ПРОЕКТА - Система за резервации в автосервизи
+#  Автор: Никола Драгнев, Ф.Н. 1MI0800237
+#  Дата: 08.02.2026
+# ============================================================
+#
+#  ВАЖНО: Командите са оптимизирани за Windows PowerShell и curl.exe.
+#  JSON форматът използва синтаксис: -d '{\"key\":\"value\"}'
+#  За Mac/Linux: използвайте стандартния синтаксис: -d '{"key":"value"}'
+#
+# ============================================================
+
+# ПОДГОТОВКА: Изтрий базата и стартирай сървъра
+#   del instance\*.db
+#   python main.py
+# Ще видиш: "Създаден admin + autoservice provider + 5 услуги"
+
+# ============================================================
+# СЦЕНАРИЙ A: ПРЕГЛЕД НА УСЛУГИ
+# ============================================================
+
+# A1. Всички услуги
+curl.exe http://localhost:5000/api/services
+
+# A2. Конкретна услуга (ID=1: Смяна на масло)
+curl.exe http://localhost:5000/api/services/1
+
+# A3. Услуги по категория
+curl.exe "http://localhost:5000/api/services?category=Поддръжка"
+
+# ============================================================
+# СЦЕНАРИЙ B: СВОБОДНИ ЧАСОВЕ И РЕЗЕРВАЦИЯ
+# ============================================================
+
+# B1. Преглед на свободни часове
+curl.exe "http://localhost:5000/api/reservations/available-slots?service_id=1&date=2026-02-10"
+
+# B2. Създаване на резервация (от admin, ID=1)
+curl.exe -X POST http://localhost:5000/api/reservations -H "Content-Type: application/json" -H "X-User-Id: 1" -d '{\"service_id\":1,\"datetime\":\"2026-02-10T10:00:00\",\"notes\":\"Oil change\"}'
+
+# B3. Проверка че часът вече е зает (10:00 НЕ трябва да е в списъка)
+curl.exe "http://localhost:5000/api/reservations/available-slots?service_id=1&date=2026-02-10"
+
+# B4. Повторен опит за същия час
+curl.exe -X POST http://localhost:5000/api/reservations -H "Content-Type: application/json" -H "X-User-Id: 1" -d '{\"service_id\":1,\"datetime\":\"2026-02-10T10:00:00\"}'
+
+# ============================================================
+# СЦЕНАРИЙ C: РЕГИСТРАЦИЯ И ПРОФИЛ
+# ============================================================
+
+# C1. Преглед на профил (admin, ID=1)
+curl.exe http://localhost:5000/api/auth/profile -H "X-User-Id: 1"
+
+# C2. Регистрация на нов потребител
+curl.exe -X POST http://localhost:5000/api/auth/register -H "Content-Type: application/json" -d '{\"username\":\"ivan\",\"email\":\"ivan@mail.bg\",\"password\":\"ivan123\"}'
+
+# C3. Преглед на профил на новия потребител (ID=3)
+curl.exe http://localhost:5000/api/auth/profile -H "X-User-Id: 3"
+
+# ============================================================
+# СЦЕНАРИЙ D: РЕЗЕРВАЦИЯ СЪС СНИМКА НА ПРОБЛЕМ
+# ============================================================
+
+# Клиентът изпраща URL към снимка при създаване на резервация
+curl.exe -X POST http://localhost:5000/api/reservations -H "Content-Type: application/json" -H "X-User-Id: 3" -d '{\"service_id\":1,\"datetime\":\"2026-02-10T14:00:00\",\"notes\":\"Engine noise\",\"problem_image_url\":\"https://cdn.pixabay.com/photo/2017/05/06/16/01/oil-2290305_640.jpg\"}'
+
+# ============================================================
+# СЦЕНАРИЙ E: ЛЮБИМИ УСЛУГИ (с admin акаунт)
+# ============================================================
+
+# E1. Добавяне на услуга към любими
+curl.exe -X POST http://localhost:5000/api/favorites -H "Content-Type: application/json" -H "X-User-Id: 1" -d '{\"service_id\":1}'
+
+# E2. Преглед на любими
+curl.exe http://localhost:5000/api/favorites -H "X-User-Id: 1"
+
+# E3. Премахване от любими
+curl.exe -X DELETE http://localhost:5000/api/favorites/1 -H "X-User-Id: 1"
+
+# E4. Проверка че е премахната
+curl.exe http://localhost:5000/api/favorites -H "X-User-Id: 1"
+
+# ============================================================
+# СЦЕНАРИЙ F: ИЗВЕСТИЯ (Notifications)
+# ============================================================
+
+# F1. Преглед на известия
+curl.exe http://localhost:5000/api/notifications -H "X-User-Id: 1"
+
+# F2. Маркиране като прочетено
+curl.exe -X PUT http://localhost:5000/api/notifications/1/read -H "X-User-Id: 1"
+
+# F3. Маркиране на всички като прочетени
+curl.exe -X PUT http://localhost:5000/api/notifications/read-all -H "X-User-Id: 1"
+
+# ============================================================
+# СЦЕНАРИЙ G: РЕВЮТА (Reviews)
+# ============================================================
+
+# G1. Създаване на ревю (от ivan, ID=3)
+curl.exe -X POST http://localhost:5000/api/reviews -H "Content-Type: application/json" -H "X-User-Id: 3" -d '{\"service_id\":1,\"rating\":5,\"comment\":\"Excellent service!\"}'
+
+# G2. Преглед на ревюта за услуга
+curl.exe http://localhost:5000/api/services/1/reviews
+
+# ============================================================
+# СЦЕНАРИЙ H: ПРЕГЛЕД НА БАЗАТА ДАННИ
+# ============================================================
+
+# Списък с таблици:
+python -c "import sqlite3; c=sqlite3.connect('instance/reservations.db'); [print(t[0]) for t in c.execute('SELECT name FROM sqlite_master WHERE type=\'table\'')]"
+
+# Преглед на потребители:
+python -c "import sqlite3; c=sqlite3.connect('instance/reservations.db'); [print(r) for r in c.execute('SELECT id, username, email, role FROM registered_user')]"
+
+# Преглед на услуги:
+python -c "import sqlite3; c=sqlite3.connect('instance/reservations.db'); [print(r) for r in c.execute('SELECT id, name, price FROM service')]"
+
+# Преглед на резервации:
+python -c "import sqlite3; c=sqlite3.connect('instance/reservations.db'); [print(r) for r in c.execute('SELECT id, service_id, customer_id, datetime, status FROM reservation')]"
+
+# ============================================================
+#  ЗА MAC/LINUX:
+#  - Заменете curl.exe с curl
+#  - Заменете синтаксиса на JSON с: -d '{"key":"value"}'
+#  - sqlite3 е вграден: sqlite3 instance/reservations.db ".tables"
+# ============================================================

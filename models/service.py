@@ -24,7 +24,6 @@ class Service(db.Model):
     description = db.Column(db.Text, nullable=True)
     category = db.Column(db.String(50), nullable=False)
 
-    # Нови полета за цена и продължителност
     price = db.Column(db.Float, nullable=True, default=0.0)
     duration = db.Column(db.Integer, nullable=True, default=60)  # В минути
 

@@ -130,7 +130,6 @@ def delete_service(service_id: int) -> tuple[Response, int]:
     if not service:
         return jsonify({'error': 'Услугата не е намерена'}), 404
 
-    # Проверяваме права
     if service.provider_id != int(user_id) and user.role != UserRole.ADMIN:
         return jsonify({'error': 'Нямате права да изтриете тази услуга'}), 403
 

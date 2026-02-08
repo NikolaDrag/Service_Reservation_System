@@ -1,7 +1,5 @@
-from typing import Any
-
 from flask import Blueprint, request, jsonify, Response
-
+from typing import Any
 from db import db
 from models.user import RegisteredUser, Provider, Admin, UserRole
 
